@@ -7,7 +7,7 @@ from config.settings import (
     LOGISTICS_STATUSES,
     STATUS_COLORS,
 )
-from services.clipboard import build_kakao_message, copy_to_clipboard
+from services.clipboard import build_kakao_message
 from services.sheets_client import get_all_returns, update_return_status
 
 
@@ -99,12 +99,9 @@ def render():
         with c6:
             btn_col1, btn_col2 = st.columns(2)
             with btn_col1:
-                if st.button("카톡복사", key=f"kakao_{row_id}", use_container_width=True):
+                with st.popover("카톡복사", use_container_width=True):
                     msg = build_kakao_message(row.to_dict())
-                    if copy_to_clipboard(msg):
-                        st.toast("클립보드에 복사되었습니다.")
-                    else:
-                        st.toast("복사 실패. 터미널 환경을 확인하세요.", icon="⚠️")
+                    st.code(msg, language=None)
             with btn_col2:
                 with st.popover("상태변경", use_container_width=True):
                     current = row.get("logistics_status", LOGISTICS_STATUSES[0])
