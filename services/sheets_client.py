@@ -35,13 +35,20 @@ VENDORS_COLUMNS = ["id", "name", "created_at"]
 
 @st.cache_resource
 def get_client() -> gspread.Client:
+    # 배포 환경: st.secrets 사용
+    if "gcp_service_account" in st.secrets:
+        creds = Credentials.from_service_account_info(
+            dict(st.secrets["gcp_service_account"]), scopes=SCOPES
+        )
+        return gspread.authorize(creds)
+
+    # 로컬 환경: credentials.json 파일 사용
     import os
     if not os.path.exists(CREDENTIALS_FILE):
         st.error(
             f"**`{CREDENTIALS_FILE}` 파일을 찾을 수 없습니다.**\n\n"
             "Google Cloud Console에서 서비스 계정 JSON 키를 다운로드한 후 "
-            f"`{os.path.abspath(CREDENTIALS_FILE)}` 경로에 저장하세요.\n\n"
-            "자세한 설정 방법은 README 또는 PRD의 Google Sheets 셋업 순서를 참고하세요."
+            f"`{os.path.abspath(CREDENTIALS_FILE)}` 경로에 저장하세요."
         )
         st.stop()
     creds = Credentials.from_service_account_file(CREDENTIALS_FILE, scopes=SCOPES)
