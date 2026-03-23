@@ -1,23 +1,9 @@
 import uuid
 from datetime import datetime
 
-import gspread
 import pandas as pd
 import streamlit as st
-from google.oauth2.service_account import Credentials
-
-from config.settings import (
-    CREDENTIALS_FILE,
-    RETURNS_SHEET,
-    SETTLEMENTS_SHEET,
-    VENDORS_SHEET,
-    SPREADSHEET_NAME,
-)
-
-SCOPES = [
-    "https://www.googleapis.com/auth/spreadsheets",
-    "https://www.googleapis.com/auth/drive",
-]
+from supabase import create_client
 
 RETURNS_COLUMNS = [
     "id", "date", "product_name", "customer_name", "contact",
@@ -30,51 +16,22 @@ SETTLEMENTS_COLUMNS = [
     "return_id", "notes", "created_at", "updated_at",
 ]
 
-VENDORS_COLUMNS = ["id", "name", "created_at"]
-
 
 @st.cache_resource
-def get_client() -> gspread.Client:
-    # 배포 환경: st.secrets 사용
-    if "gcp_service_account" in st.secrets:
-        creds = Credentials.from_service_account_info(
-            dict(st.secrets["gcp_service_account"]), scopes=SCOPES
-        )
-        return gspread.authorize(creds)
-
-    # 로컬 환경: credentials.json 파일 사용
-    import os
-    if not os.path.exists(CREDENTIALS_FILE):
-        st.error(
-            f"**`{CREDENTIALS_FILE}` 파일을 찾을 수 없습니다.**\n\n"
-            "Google Cloud Console에서 서비스 계정 JSON 키를 다운로드한 후 "
-            f"`{os.path.abspath(CREDENTIALS_FILE)}` 경로에 저장하세요."
-        )
-        st.stop()
-    creds = Credentials.from_service_account_file(CREDENTIALS_FILE, scopes=SCOPES)
-    return gspread.authorize(creds)
+def _get_client():
+    url = st.secrets["supabase"]["url"]
+    key = st.secrets["supabase"]["key"]
+    return create_client(url, key)
 
 
-def _get_spreadsheet():
-    return get_client().open(SPREADSHEET_NAME)
-
+# ── 반품/교환 ───────────────────────────────────────────
 
 @st.cache_data(ttl=30)
 def get_all_returns() -> pd.DataFrame:
-    sheet = _get_spreadsheet().worksheet(RETURNS_SHEET)
-    records = sheet.get_all_records()
-    if not records:
+    result = _get_client().table("returns").select("*").order("created_at", desc=True).execute()
+    if not result.data:
         return pd.DataFrame(columns=RETURNS_COLUMNS)
-    return pd.DataFrame(records)
-
-
-@st.cache_data(ttl=30)
-def get_all_settlements() -> pd.DataFrame:
-    sheet = _get_spreadsheet().worksheet(SETTLEMENTS_SHEET)
-    records = sheet.get_all_records()
-    if not records:
-        return pd.DataFrame(columns=SETTLEMENTS_COLUMNS)
-    return pd.DataFrame(records)
+    return pd.DataFrame(result.data)
 
 
 def append_return(row_dict: dict) -> None:
@@ -86,20 +43,27 @@ def append_return(row_dict: dict) -> None:
         "updated_at": now,
         **row_dict,
     }
-    sheet = _get_spreadsheet().worksheet(RETURNS_SHEET)
-    sheet.append_row([row.get(col, "") for col in RETURNS_COLUMNS])
+    _get_client().table("returns").insert(row).execute()
     st.cache_data.clear()
 
 
 def update_return_status(row_id: str, new_status: str) -> None:
-    sheet = _get_spreadsheet().worksheet(RETURNS_SHEET)
-    row_num = _find_row_by_id(sheet, row_id)
     now = datetime.now().isoformat(timespec="seconds")
-    status_col = RETURNS_COLUMNS.index("logistics_status") + 1
-    updated_col = RETURNS_COLUMNS.index("updated_at") + 1
-    sheet.update_cell(row_num, status_col, new_status)
-    sheet.update_cell(row_num, updated_col, now)
+    _get_client().table("returns").update({
+        "logistics_status": new_status,
+        "updated_at": now,
+    }).eq("id", row_id).execute()
     st.cache_data.clear()
+
+
+# ── 정산 ────────────────────────────────────────────────
+
+@st.cache_data(ttl=30)
+def get_all_settlements() -> pd.DataFrame:
+    result = _get_client().table("settlements").select("*").order("created_at", desc=True).execute()
+    if not result.data:
+        return pd.DataFrame(columns=SETTLEMENTS_COLUMNS)
+    return pd.DataFrame(result.data)
 
 
 def append_settlement(row_dict: dict) -> None:
@@ -111,54 +75,40 @@ def append_settlement(row_dict: dict) -> None:
         "updated_at": now,
         **row_dict,
     }
-    sheet = _get_spreadsheet().worksheet(SETTLEMENTS_SHEET)
-    sheet.append_row([row.get(col, "") for col in SETTLEMENTS_COLUMNS])
+    _get_client().table("settlements").insert(row).execute()
     st.cache_data.clear()
 
 
 def update_settlement_status(row_id: str, new_status: str) -> None:
-    sheet = _get_spreadsheet().worksheet(SETTLEMENTS_SHEET)
-    row_num = _find_row_by_id(sheet, row_id)
     now = datetime.now().isoformat(timespec="seconds")
-    status_col = SETTLEMENTS_COLUMNS.index("settlement_status") + 1
-    updated_col = SETTLEMENTS_COLUMNS.index("updated_at") + 1
-    sheet.update_cell(row_num, status_col, new_status)
-    sheet.update_cell(row_num, updated_col, now)
+    _get_client().table("settlements").update({
+        "settlement_status": new_status,
+        "updated_at": now,
+    }).eq("id", row_id).execute()
     st.cache_data.clear()
 
 
-@st.cache_data(ttl=30)
+# ── 거래처 ───────────────────────────────────────────────
+
 def get_all_vendors() -> list[str]:
-    sheet = _get_spreadsheet().worksheet(VENDORS_SHEET)
-    records = sheet.get_all_records()
-    if not records:
-        return []
-    return sorted([r["name"] for r in records if r.get("name")])
+    if "vendors" not in st.session_state:
+        result = _get_client().table("vendors").select("name").order("name").execute()
+        st.session_state.vendors = [r["name"] for r in result.data] if result.data else []
+    return st.session_state.vendors
 
 
 def append_vendor(name: str) -> None:
     now = datetime.now().isoformat(timespec="seconds")
-    sheet = _get_spreadsheet().worksheet(VENDORS_SHEET)
-    sheet.append_row([str(uuid.uuid4()), name, now])
-    st.cache_data.clear()
+    _get_client().table("vendors").insert({
+        "id": str(uuid.uuid4()),
+        "name": name,
+        "created_at": now,
+    }).execute()
+    vendors = list(st.session_state.get("vendors", []))
+    vendors.append(name)
+    st.session_state.vendors = sorted(vendors)
 
 
 def delete_vendor(name: str) -> None:
-    sheet = _get_spreadsheet().worksheet(VENDORS_SHEET)
-    names = sheet.col_values(2)  # Column B = name
-    try:
-        idx = names.index(name)
-        sheet.delete_rows(idx + 1)  # 1-based
-        st.cache_data.clear()
-    except ValueError:
-        raise ValueError(f"거래처 '{name}'을(를) 찾을 수 없습니다.")
-
-
-def _find_row_by_id(sheet: gspread.Worksheet, row_id: str) -> int:
-    ids = sheet.col_values(1)  # Column A (1-indexed)
-    try:
-        # ids[0] is header "id", data starts at index 1 → row 2
-        idx = ids.index(row_id)
-        return idx + 1  # 1-based row number
-    except ValueError:
-        raise ValueError(f"ID '{row_id}' not found in sheet '{sheet.title}'")
+    _get_client().table("vendors").delete().eq("name", name).execute()
+    st.session_state.vendors = [v for v in st.session_state.get("vendors", []) if v != name]

@@ -10,6 +10,7 @@ def render():
         with col1:
             name = st.text_input("거래처명 *", placeholder="예: 한국물산")
         with col2:
+            st.write("")
             submitted = st.form_submit_button("등록", type="primary", use_container_width=True)
 
     if submitted:
@@ -22,6 +23,7 @@ def render():
             else:
                 append_vendor(name.strip())
                 st.success(f"✅ '{name}' 등록 완료")
+                st.rerun()
 
     st.divider()
     st.subheader("등록된 거래처 목록")
