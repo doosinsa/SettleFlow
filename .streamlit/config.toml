@@ -1,5 +1,4 @@
 [theme]
-# SettleFlow 기본 테마 (Streamlit Native Theme)
-base = "dark"
+# SettleFlow 기본 테마 컬러 (base 고정을 해제하여 사용자 모드 선택 활성화)
 primaryColor = "#3B82F6"
 font = "sans serif"
