@@ -1,13 +1,12 @@
 import math
 import streamlit as st
 
-from config.settings import ITEMS_PER_PAGE, LOGISTICS_STATUSES, STATUS_COLORS
+from config.settings import ITEMS_PER_PAGE, LOGISTICS_STATUSES, STATUS_COLORS, REASON_OPTIONS
 from services.clipboard import build_kakao_message
-from services.sheets_client import get_all_returns, update_return_status
+from services.sheets_client import get_all_returns, update_return_status, update_return_full, delete_return
 
 def _status_badge(status: str) -> str:
     color = STATUS_COLORS.get(status, "#6B7280")
-    # 약간 더 부드럽고 모던한 느낌의 뱃지로 렌더링
     return f"""
     <span style="
         background-color: {color}15;
@@ -21,6 +20,38 @@ def _status_badge(status: str) -> str:
         margin-bottom: 0.5rem;
     ">{status}</span>
     """
+
+@st.dialog("🖊️ 반품/교환 정보 수정")
+def edit_dialog(row_dict: dict):
+    with st.form(f"edit_form_{row_dict['id']}", border=False):
+        st.caption("고객 정보 및 주문 정보를 수정합니다.")
+        c1, c2 = st.columns(2)
+        with c1:
+            prod = st.text_input("상품명", value=row_dict.get("product_name", ""))
+            cust = st.text_input("고객명", value=row_dict.get("customer_name", ""))
+            order_dt = st.text_input("주문날짜", value=row_dict.get("order_date", ""))
+            cont = st.text_input("연락처", value=row_dict.get("contact", ""))
+        with c2:
+            ven = st.text_input("거래처", value=row_dict.get("vendor", ""))
+            
+            # 사유 콤보박스 기본 인덱스 처리
+            reason_val = row_dict.get("reason", "")
+            r_idx = REASON_OPTIONS.index(reason_val) if reason_val in REASON_OPTIONS else 0
+            res = st.selectbox("사유", REASON_OPTIONS, index=r_idx)
+            
+            trk = st.text_input("송장번호", value=row_dict.get("tracking_number", ""))
+            nt = st.text_input("비고", value=row_dict.get("notes", ""))
+            
+        btn = st.form_submit_button("✅ 변경하기", type="primary", use_container_width=True)
+        if btn:
+            new_data = dict(row_dict)
+            new_data.update({
+                "product_name": prod, "customer_name": cust, "order_date": order_dt,
+                "contact": cont, "vendor": ven, "reason": res,
+                "tracking_number": trk, "notes": nt
+            })
+            update_return_full(row_dict["id"], new_data)
+            st.rerun()
 
 def render():
     st.markdown("### 📋 반품/교환 현황")
@@ -57,7 +88,6 @@ def render():
 
     st.markdown("<br>", unsafe_allow_html=True)
     
-    # 페이지네이션
     col_p1, col_p2 = st.columns([4, 1])
     with col_p2:
         total_pages = max(1, math.ceil(total / ITEMS_PER_PAGE))
@@ -70,55 +100,55 @@ def render():
     
     start = (page - 1) * ITEMS_PER_PAGE
     page_df = filtered.iloc[start : start + ITEMS_PER_PAGE]
-
     st.markdown("---")
 
-    # --- 반응형 카드(Card) 레이아웃 리스트 ---
+    # --- 카드(Card) 레이아웃 리스트 ---
     for _, row in page_df.iterrows():
         row_id = row["id"]
-        # 건별로 분리된 컨테이너
         with st.container(border=True):
             info_col, action_col = st.columns([4, 1])
             
             with info_col:
-                # 상태 뱃지 및 날짜 (html 렌더링)
-                st.markdown(f"{_status_badge(row.get('logistics_status', ''))} &nbsp;&nbsp; `<{row.get('date', '')}>`", unsafe_allow_html=True)
+                # 상태 배지 + 접수/주문 날짜 표출
+                st.markdown(f"{_status_badge(row.get('logistics_status', ''))} &nbsp;&nbsp; `<접수: {row.get('date', '')} | 주문: {row.get('order_date', '미입력')}>`", unsafe_allow_html=True)
                 
-                # 메인 타이틀(상품 + 고객명)
-                st.markdown(
-                    f"#### {row.get('product_name', '상품명 없음')} "
-                    f"<span style='font-size: 0.9em; font-weight: 400; color: gray;'>/ {row.get('customer_name', '고객')}</span>", 
-                    unsafe_allow_html=True
-                )
+                st.markdown(f"#### {row.get('product_name', '상품명 없음')} <span style='font-size: 0.9em; font-weight: 400; color: gray;'>/ {row.get('customer_name', '고객')} ({row.get('contact', '연락처없음')})</span>", unsafe_allow_html=True)
                 
-                # 주요 부가 정보
-                st.caption(
-                    f"**🏢 {row.get('vendor', '')}** | 🚚 {row.get('tracking_number', '송장 미입력')} "
-                    f"| 💰 택비: {row.get('delivery_fee', '')} | 🏷️ 사유: {row.get('reason', '')}"
-                )
+                st.caption(f"**🏢 {row.get('vendor', '')}** | 🚚 {row.get('tracking_number', '미입력')} | 💰 택비: {row.get('delivery_fee', '')} | 🏷️ {row.get('reason', '')}")
                 if row.get("notes"):
                     st.caption(f"📝 {row['notes']}")
 
             with action_col:
-                # 버튼들의 수직 여백/정렬 조정
-                st.markdown("<div style='margin-top: 2rem;'></div>", unsafe_allow_html=True)
-                
-                # 카톡복사 기능을 popover로 감춤 (UI 간소화)
-                with st.popover("💬 카톡 양식", use_container_width=True):
+                st.write("") 
+                # 카톡 복사
+                with st.popover("💬 카톡양식", use_container_width=True):
                     msg = build_kakao_message(row.to_dict())
                     st.code(msg, language="text")
                     
-                # 상태변경 액션
-                with st.popover("🔄 변경", use_container_width=True):
+                # 관리 메뉴 (상태변경 & 추가 액션)
+                with st.popover("⚙️ 관리", use_container_width=True):
+                    st.caption("상태 변경")
                     current = row.get("logistics_status", LOGISTICS_STATUSES[0])
                     current_idx = LOGISTICS_STATUSES.index(current) if current in LOGISTICS_STATUSES else 0
                     new_status = st.selectbox(
-                        "새 상태 지정",
+                        "상태지정",
                         LOGISTICS_STATUSES,
                         index=current_idx,
-                        key=f"ret_sel_{row_id}",
+                        key=f"sel_{row_id}",
+                        label_visibility="collapsed"
                     )
-                    if st.button("확인", key=f"ret_confirm_{row_id}", type="primary", use_container_width=True):
+                    if st.button("상태 저장", key=f"confirm_{row_id}", type="primary", use_container_width=True):
                         if new_status != current:
                             update_return_status(row_id, new_status)
                             st.rerun()
+                            
+                    st.divider()
+                    
+                    st.caption("데이터 권한")
+                    if st.button("🖊️ 세부내용 수정", key=f"edit_{row_id}", use_container_width=True):
+                        edit_dialog(row.to_dict())
+                        
+                    if st.button("🗑️ 영구 삭제", key=f"del_{row_id}", use_container_width=True):
+                        delete_return(row_id)
+                        st.rerun()
+

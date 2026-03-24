@@ -6,7 +6,7 @@ import streamlit as st
 from supabase import create_client
 
 RETURNS_COLUMNS = [
-    "id", "date", "product_name", "customer_name", "contact",
+    "id", "date", "order_date", "product_name", "customer_name", "contact",
     "reason", "vendor", "tracking_number", "delivery_fee",
     "notes", "logistics_status", "created_at", "updated_at",
 ]
@@ -41,6 +41,7 @@ def append_return(row_dict: dict) -> None:
         "logistics_status": "신청",
         "created_at": now,
         "updated_at": now,
+        "order_date": row_dict.get("order_date", ""), # 주문날짜 옵셔널 매핑 처리
         **row_dict,
     }
     _get_client().table("returns").insert(row).execute()
@@ -53,6 +54,24 @@ def update_return_status(row_id: str, new_status: str) -> None:
         "logistics_status": new_status,
         "updated_at": now,
     }).eq("id", row_id).execute()
+    st.cache_data.clear()
+
+def update_return_full(row_id: str, new_data: dict) -> None:
+    """반품 데이터 전체를 업데이트합니다."""
+    now = datetime.now().isoformat(timespec="seconds")
+    update_payload = dict(new_data)
+    update_payload["updated_at"] = now
+    
+    # ID는 변경 불가하므로 payload에 있다면 제거
+    if "id" in update_payload:
+        del update_payload["id"]
+        
+    _get_client().table("returns").update(update_payload).eq("id", row_id).execute()
+    st.cache_data.clear()
+
+def delete_return(row_id: str) -> None:
+    """특정 반품 데이터를 영구 삭제합니다."""
+    _get_client().table("returns").delete().eq("id", row_id).execute()
     st.cache_data.clear()
 
 

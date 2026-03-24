@@ -22,4 +22,4 @@ STATUS_COLORS = {
 
 ITEMS_PER_PAGE = 15
 
-KAKAO_FORMAT = "[{vendor}] 반품요청: {customer_name}/{product_name}/{reason}/송장:{tracking_number}"
+KAKAO_FORMAT = "[{vendor}] 반품요청: {order_date} / {customer_name}({contact}) / {product_name} / {reason} / 송장:{tracking_number}"

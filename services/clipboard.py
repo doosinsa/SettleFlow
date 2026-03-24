@@ -8,6 +8,8 @@ def build_kakao_message(row: dict) -> str:
     """
     return KAKAO_FORMAT.format(
         vendor=row.get("vendor", ""),
+        order_date=row.get("order_date", "날짜없음"),
+        contact=row.get("contact", "연락처없음"),
         customer_name=row.get("customer_name", ""),
         product_name=row.get("product_name", ""),
         reason=row.get("reason", ""),

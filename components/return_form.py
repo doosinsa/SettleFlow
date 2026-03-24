@@ -9,12 +9,14 @@ def render():
     
     with st.form("return_form", clear_on_submit=True, border=True):
         st.markdown("#### 1. 기본 정보")
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            date = st.date_input("날짜 *")
-        with col2:
+        col_d1, col_d2, col_p, col_c = st.columns([1, 1, 1.5, 1.5])
+        with col_d1:
+            date = st.date_input("접수날짜 *")
+        with col_d2:
+            order_date = st.date_input("주문날짜")
+        with col_p:
             product_name = st.text_input("상품명 *", placeholder="예: 화이트 라운드 티")
-        with col3:
+        with col_c:
             customer_name = st.text_input("고객명 *", placeholder="예: 홍길동")
             
         st.markdown("<div style='margin-bottom: 0.5rem;'></div>", unsafe_allow_html=True)
@@ -22,7 +24,7 @@ def render():
         st.markdown("#### 2. 반품/교환 상세")
         col4, col5, col6 = st.columns(3)
         with col4:
-            contact = st.text_input("연락처", placeholder="예: 010-1234-5678")
+            contact = st.text_input("연락처", placeholder="010-1234-5678 (카톡 포함됨)")
             tracking_number = st.text_input("송장번호", placeholder="교환/회수 송장번호")
         with col5:
             reason = st.selectbox("사유 *", REASON_OPTIONS)
@@ -45,6 +47,7 @@ def render():
 
         append_return({
             "date": date.strftime("%Y-%m-%d"),
+            "order_date": order_date.strftime("%Y-%m-%d") if order_date else "",
             "product_name": product_name,
             "customer_name": customer_name,
             "contact": contact,
