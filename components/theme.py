@@ -23,41 +23,60 @@ LIGHT = {
 
 def apply():
     if "dark_mode" not in st.session_state:
-        st.session_state.dark_mode = True  # 다크모드가 기본값
+        st.session_state.dark_mode = True
 
     c = DARK if st.session_state.dark_mode else LIGHT
 
+    # 너무 자잘한 span, div 등 모든 태그에 강제 주입을 걸어 화면 레이아웃이 깨지던 현상 수정.
+    # 꼭 필요한 큰 컨테이너나 배경, 그리고 기본 텍스트에만 조심스럽게 오버라이딩합니다.
     st.markdown(f"""
     <style>
+        /* 메인 배경색 */
         .stApp {{
             background-color: {c['bg']} !important;
+            color: {c['text']};
         }}
-        section[data-testid="stSidebar"],
+        
+        header[data-testid="stHeader"] {{
+            background-color: transparent !important;
+        }}
+
+        /* 하우스 및 컨테이너 (카드 디자인) 영역 */
+        div[data-testid="stSidebar"],
         .stTabs [data-baseweb="tab-panel"],
         div[data-testid="stForm"],
         div[data-testid="stVerticalBlock"] > div[style*="flex-direction: column;"] {{
-            background-color: {c['bg']} !important;
-        }}
-        .stMarkdown, .stText, p, span, label, div {{
-            color: {c['text']} !important;
-        }}
-        h1, h2, h3, h4, h5, h6 {{
-            color: {c['text']} !important;
-        }}
-        .stTextInput input,
-        .stSelectbox div[data-baseweb="select"] > div,
-        .stNumberInput input,
-        .stDateInput input,
-        textarea {{
-            background-color: {c['input_bg']} !important;
-            color: {c['text']} !important;
+            background-color: {c['secondary_bg']} !important;
             border-color: {c['border']} !important;
         }}
+
+        /* 글씨 타겟팅 (범위 최소화) */
+        .stMarkdown, .stText, label, p, h1, h2, h3, h4, h5, h6 {{
+            color: {c['text']} !important;
+        }}
+        
+        .stCaptionContainer * {{
+            color: {c['subtext']} !important;
+        }}
+
+        /* 위젯 및 입력 칸 */
+        div[data-baseweb="input"], 
+        div[data-baseweb="base-input"],
+        div[data-baseweb="select"] > div {{
+            background-color: {c['input_bg']} !important;
+            border-color: {c['border']} !important;
+        }}
+        
+        input, textarea, .stSelectbox div[data-baseweb="select"] div {{
+            color: {c['text']} !important;
+        }}
+
+        /* 버튼 및 툴팁 메뉴 배경 등 */
         div[data-baseweb="popover"] > div,
         div[data-baseweb="menu"] {{
             background-color: {c['secondary_bg']} !important;
-            color: {c['text']} !important;
         }}
+
         /* 구조적 여백 유지 */
         .block-container {{
             padding-top: 2rem !important;
@@ -68,6 +87,7 @@ def apply():
             border-radius: 12px;
             border: 1px solid {c['border']} !important;
         }}
+        
         /* 탭 가독성 */
         .stTabs [data-baseweb="tab-list"] {{
             gap: 2rem;
@@ -90,7 +110,6 @@ def apply():
 
 
 def toggle_button():
-    # 현재 상태와 반대되는 전환 라벨(버튼 이름) 표기
     label = "☀️ 라이트" if st.session_state.dark_mode else "🌙 다크 모드"
     if st.button(label, key="theme_toggle"):
         st.session_state.dark_mode = not st.session_state.dark_mode
