@@ -106,6 +106,19 @@ def update_settlement_status(row_id: str, new_status: str) -> None:
     }).eq("id", row_id).execute()
     st.cache_data.clear()
 
+def update_settlement_full(row_id: str, new_data: dict) -> None:
+    now = datetime.now().isoformat(timespec="seconds")
+    update_payload = dict(new_data)
+    update_payload["updated_at"] = now
+    if "id" in update_payload:
+        del update_payload["id"]
+    _get_client().table("settlements").update(update_payload).eq("id", row_id).execute()
+    st.cache_data.clear()
+
+def delete_settlement(row_id: str) -> None:
+    _get_client().table("settlements").delete().eq("id", row_id).execute()
+    st.cache_data.clear()
+
 
 # ── 거래처 ───────────────────────────────────────────────
 
