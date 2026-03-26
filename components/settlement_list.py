@@ -93,40 +93,31 @@ def render():
     with col_m1:
         st.metric(label="📊 조회된 미정산 합계액", value=f"{total_unpaid:,.0f} 원", delta="결제 대기중", delta_color="inverse")
 
-    # --- 선택 항목 일괄 상태 변경 바 ---
+    # --- 일괄 상태 변경 (선택 항목 or 전체) ---
     selected_ids = [k.replace("set_chk_", "") for k, v in st.session_state.items() if k.startswith("set_chk_") and v]
-    if selected_ids:
-        with st.container(border=True):
-            sc1, sc2, sc3 = st.columns([1.5, 1.5, 1])
-            with sc1:
-                st.info(f"☑️ {len(selected_ids)}건 선택됨")
-            with sc2:
-                batch_to_sel = st.selectbox("변경할 상태", SETTLEMENT_STATUSES, key="batch_to_sel")
-            with sc3:
-                st.markdown("<div style='height: 24px;'></div>", unsafe_allow_html=True)
-                if st.button("선택 항목 일괄 변경", type="primary", use_container_width=True):
-                    batch_update_settlement_status(selected_ids, batch_to_sel)
-                    for k in list(st.session_state.keys()):
-                        if k.startswith(("set_chk_", "set_sel_")):
-                            del st.session_state[k]
-                    st.rerun()
+    has_selection = len(selected_ids) > 0
+    expander_label = f"⚡ 일괄 상태 변경 (☑️ {len(selected_ids)}건 선택됨)" if has_selection else "⚡ 일괄 상태 변경"
 
-    # --- 전체 일괄 변경 (현재 필터 기준) ---
-    with st.expander("⚡ 조회 결과 전체 일괄 변경"):
+    with st.expander(expander_label, expanded=has_selection):
         bc1, bc2 = st.columns([2, 1])
         with bc1:
+            if has_selection:
+                st.caption(f"선택한 {len(selected_ids)}건만 변경됩니다.")
+            else:
+                st.caption("현재 조회된 전체 항목이 변경됩니다. 특정 항목만 변경하려면 아래 체크박스를 선택하세요.")
             batch_to = st.selectbox("변경할 상태", SETTLEMENT_STATUSES, key="batch_to")
         with bc2:
-            st.markdown("<div style='height: 24px;'></div>", unsafe_allow_html=True)
-            if st.button("전체 일괄 변경", type="primary", use_container_width=True):
-                ids = filtered["id"].tolist()
+            st.markdown("<div style='height: 52px;'></div>", unsafe_allow_html=True)
+            btn_label = f"선택 {len(selected_ids)}건 변경" if has_selection else "전체 일괄 변경"
+            if st.button(btn_label, type="primary", use_container_width=True):
+                ids = selected_ids if has_selection else filtered["id"].tolist()
                 if not ids:
                     st.warning("변경할 항목이 없습니다.")
                 else:
+                    batch_update_settlement_status(ids, batch_to)
                     for k in list(st.session_state.keys()):
                         if k.startswith(("set_chk_", "set_sel_")):
-                            del st.session_state[k]
-                    batch_update_settlement_status(ids, batch_to)
+                            st.session_state[k] = False
                     st.rerun()
 
     st.markdown("<div style='margin-bottom: 1rem;'></div>", unsafe_allow_html=True)
