@@ -9,7 +9,7 @@ def render():
     with st.form("settlement_form", clear_on_submit=True, border=True):
         col_date, col_vendor, col_amt = st.columns([1, 1.5, 1.5])
         with col_date:
-            settlement_dt = st.date_input("정산일 *")
+            settlement_dt = st.date_input("정산일 *", help="거래처에 실제 정산(송금)하는 날짜")
         with col_vendor:
             vendors = get_all_vendors()
             if vendors:
@@ -20,9 +20,16 @@ def render():
             # 콤마 단위를 보기 편하게 step과 format 지정 (원화 느낌의 integer)
             amount = st.number_input("정산금액 (원) *", min_value=0, step=1000, value=0, format="%d")
             
-        col_ret, col_note = st.columns([1.5, 2.5])
+        col_period, col_ret, col_note = st.columns([2, 1, 2])
+        with col_period:
+            sales_period = st.date_input(
+                "매출 기간 (시작~종료)",
+                value=[],
+                key="sales_period",
+                help="이 정산에 해당하는 매출 발생 기간 (예: 3/1~3/15 매출분 정산)",
+            )
         with col_ret:
-            return_id = st.text_input("연계 반품ID (선택)", placeholder="관련 반품 건의 아이디 기입")
+            return_id = st.text_input("연계 반품ID (선택)", placeholder="반품 건 아이디")
         with col_note:
             notes = st.text_input("비고", placeholder="이체 메모 등 추가 정보")
 
@@ -37,11 +44,21 @@ def render():
             st.error("⚠️ 0원 초과의 실제 정산금액을 입력해주세요.")
             return
 
+        # 매출 기간 처리
+        period_start = ""
+        period_end = ""
+        if sales_period and len(sales_period) == 2:
+            period_start = sales_period[0].strftime("%Y-%m-%d")
+            period_end = sales_period[1].strftime("%Y-%m-%d")
+
         append_settlement({
             "settlement_date": settlement_dt.strftime("%Y-%m-%d"),
+            "period_start": period_start,
+            "period_end": period_end,
             "vendor": vendor,
             "amount": int(amount),
             "return_id": return_id,
             "notes": notes,
         })
-        st.success(f"✅ [{vendor}] 거래처와 {amount:,}원의 정산 내역이 날짜({settlement_dt})에 성공적으로 입력되었습니다.")
+        period_str = f" (매출기간: {period_start}~{period_end})" if period_start else ""
+        st.success(f"✅ [{vendor}] 거래처 {amount:,}원 정산 등록 완료{period_str}")
