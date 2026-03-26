@@ -12,7 +12,8 @@ RETURNS_COLUMNS = [
 ]
 
 SETTLEMENTS_COLUMNS = [
-    "id", "vendor", "amount", "settlement_status",
+    "id", "settlement_date", "period_start", "period_end",
+    "vendor", "amount", "settlement_status",
     "return_id", "notes", "created_at", "updated_at",
 ]
 
@@ -105,6 +106,15 @@ def update_settlement_status(row_id: str, new_status: str) -> None:
         "updated_at": now,
     }).eq("id", row_id).execute()
     st.cache_data.clear()
+
+def batch_update_settlement_status(row_ids: list[str], new_status: str) -> None:
+    now = datetime.now().isoformat(timespec="seconds")
+    _get_client().table("settlements").update({
+        "settlement_status": new_status,
+        "updated_at": now,
+    }).in_("id", row_ids).execute()
+    st.cache_data.clear()
+
 
 def update_settlement_full(row_id: str, new_data: dict) -> None:
     now = datetime.now().isoformat(timespec="seconds")

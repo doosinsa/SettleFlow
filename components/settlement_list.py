@@ -2,7 +2,7 @@ import math
 import streamlit as st
 
 from config.settings import ITEMS_PER_PAGE, SETTLEMENT_STATUSES, STATUS_COLORS
-from services.sheets_client import get_all_settlements, update_settlement_status, update_settlement_full, delete_settlement
+from services.sheets_client import get_all_settlements, update_settlement_status, update_settlement_full, delete_settlement, batch_update_settlement_status
 
 def _status_badge(status: str) -> str:
     color = STATUS_COLORS.get(status, "#6B7280")
@@ -93,6 +93,28 @@ def render():
     with col_m1:
         st.metric(label="📊 조회된 미정산 합계액", value=f"{total_unpaid:,.0f} 원", delta="결제 대기중", delta_color="inverse")
 
+    # --- 일괄 상태 변경 ---
+    with st.expander("⚡ 일괄 상태 변경"):
+        bc1, bc2, bc3 = st.columns([1.5, 1.5, 1])
+        with bc1:
+            batch_from = st.selectbox("현재 상태", SETTLEMENT_STATUSES, key="batch_from")
+        with bc2:
+            batch_to = st.selectbox("변경할 상태", SETTLEMENT_STATUSES, key="batch_to")
+        with bc3:
+            st.write("")
+            if st.button("일괄 변경", type="primary", use_container_width=True):
+                if batch_from == batch_to:
+                    st.warning("같은 상태로는 변경할 수 없습니다.")
+                else:
+                    targets = filtered[filtered["settlement_status"] == batch_from]
+                    if targets.empty:
+                        st.warning(f"'{batch_from}' 상태인 항목이 없습니다.")
+                    else:
+                        ids = targets["id"].tolist()
+                        batch_update_settlement_status(ids, batch_to)
+                        st.success(f"✅ {len(ids)}건을 '{batch_to}'(으)로 변경했습니다.")
+                        st.rerun()
+
     st.markdown("<div style='margin-bottom: 1rem;'></div>", unsafe_allow_html=True)
 
     total = len(filtered)
@@ -134,6 +156,10 @@ def render():
                 st.markdown(f"#### 🏢 {row.get('vendor', '알수없음')} <span style='color: #4CAF50;'>({amt_str})</span>", unsafe_allow_html=True)
                 
                 add_infos = []
+                ps = row.get("period_start", "")
+                pe = row.get("period_end", "")
+                if ps and pe:
+                    add_infos.append(f"📆 매출기간: {ps} ~ {pe}")
                 if row.get("return_id"):
                     add_infos.append(f"🔗 연계 반품ID: {row['return_id']}")
                 if row.get("notes"):
@@ -143,28 +169,24 @@ def render():
 
             with action_col:
                 st.write("")
+                current = row.get("settlement_status", SETTLEMENT_STATUSES[0])
+                current_idx = SETTLEMENT_STATUSES.index(current) if current in SETTLEMENT_STATUSES else 0
+                new_status = st.selectbox(
+                    "상태",
+                    SETTLEMENT_STATUSES,
+                    index=current_idx,
+                    key=f"set_sel_{row_id}",
+                    label_visibility="collapsed"
+                )
+                if new_status != current:
+                    update_settlement_status(row_id, new_status)
+                    st.rerun()
+
                 with st.popover("⚙️ 관리", use_container_width=True):
-                    st.caption("상태 변경")
-                    current = row.get("settlement_status", SETTLEMENT_STATUSES[0])
-                    current_idx = SETTLEMENT_STATUSES.index(current) if current in SETTLEMENT_STATUSES else 0
-                    new_status = st.selectbox(
-                        "상태지정",
-                        SETTLEMENT_STATUSES,
-                        index=current_idx,
-                        key=f"set_sel_{row_id}",
-                        label_visibility="collapsed"
-                    )
-                    if st.button("상태 저장", key=f"set_confirm_{row_id}", type="primary", use_container_width=True):
-                        if new_status != current:
-                            update_settlement_status(row_id, new_status)
-                            st.rerun()
-                            
-                    st.divider()
-                    
                     st.caption("데이터 컨트롤")
                     if st.button("🖊️ 세부내용 수정", key=f"set_edit_{row_id}", use_container_width=True):
                         edit_settlement_dialog(row.to_dict())
-                        
+
                     if st.button("🗑️ 영구 삭제", key=f"set_del_{row_id}", use_container_width=True):
                         delete_settlement(row_id)
                         st.rerun()
