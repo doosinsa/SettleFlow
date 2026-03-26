@@ -27,7 +27,7 @@ def _get_client():
 
 # ── 반품/교환 ───────────────────────────────────────────
 
-@st.cache_data(ttl=30)
+@st.cache_data(ttl=30, show_spinner=False)
 def get_all_returns() -> pd.DataFrame:
     result = _get_client().table("returns").select("*").order("created_at", desc=True).execute()
     if not result.data:
@@ -78,7 +78,7 @@ def delete_return(row_id: str) -> None:
 
 # ── 정산 ────────────────────────────────────────────────
 
-@st.cache_data(ttl=30)
+@st.cache_data(ttl=30, show_spinner=False)
 def get_all_settlements() -> pd.DataFrame:
     result = _get_client().table("settlements").select("*").order("created_at", desc=True).execute()
     if not result.data:
