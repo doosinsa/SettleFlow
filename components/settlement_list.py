@@ -107,7 +107,7 @@ def render():
                 if st.button("선택 항목 일괄 변경", type="primary", use_container_width=True):
                     batch_update_settlement_status(selected_ids, batch_to_sel)
                     for k in list(st.session_state.keys()):
-                        if k.startswith("set_chk_"):
+                        if k.startswith(("set_chk_", "set_sel_")):
                             del st.session_state[k]
                     st.rerun()
 
@@ -124,7 +124,7 @@ def render():
                     st.warning("변경할 항목이 없습니다.")
                 else:
                     for k in list(st.session_state.keys()):
-                        if k.startswith("set_chk_"):
+                        if k.startswith(("set_chk_", "set_sel_")):
                             del st.session_state[k]
                     batch_update_settlement_status(ids, batch_to)
                     st.rerun()
