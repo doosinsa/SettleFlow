@@ -116,8 +116,10 @@ def render():
                 else:
                     batch_update_settlement_status(ids, batch_to)
                     for k in list(st.session_state.keys()):
-                        if k.startswith(("set_chk_", "set_sel_")):
+                        if k.startswith("set_chk_"):
                             st.session_state[k] = False
+                        elif k.startswith("set_sel_"):
+                            del st.session_state[k]
                     st.rerun()
 
     st.markdown("<div style='margin-bottom: 1rem;'></div>", unsafe_allow_html=True)
