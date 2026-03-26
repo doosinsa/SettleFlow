@@ -111,27 +111,21 @@ def render():
                             del st.session_state[k]
                     st.rerun()
 
-    # --- 상태 기준 일괄 변경 ---
-    with st.expander("⚡ 상태 기준 일괄 변경"):
-        bc1, bc2, bc3 = st.columns([1.5, 1.5, 1])
+    # --- 전체 일괄 변경 (현재 필터 기준) ---
+    with st.expander("⚡ 조회 결과 전체 일괄 변경"):
+        bc1, bc2 = st.columns([2, 1])
         with bc1:
-            batch_from = st.selectbox("현재 상태", SETTLEMENT_STATUSES, key="batch_from")
-        with bc2:
             batch_to = st.selectbox("변경할 상태", SETTLEMENT_STATUSES, key="batch_to")
-        with bc3:
+        with bc2:
             st.write("")
-            if st.button("일괄 변경", type="primary", use_container_width=True):
-                if batch_from == batch_to:
-                    st.warning("같은 상태로는 변경할 수 없습니다.")
+            if st.button("전체 일괄 변경", type="primary", use_container_width=True):
+                ids = filtered["id"].tolist()
+                if not ids:
+                    st.warning("변경할 항목이 없습니다.")
                 else:
-                    targets = filtered[filtered["settlement_status"] == batch_from]
-                    if targets.empty:
-                        st.warning(f"'{batch_from}' 상태인 항목이 없습니다.")
-                    else:
-                        ids = targets["id"].tolist()
-                        batch_update_settlement_status(ids, batch_to)
-                        st.success(f"✅ {len(ids)}건을 '{batch_to}'(으)로 변경했습니다.")
-                        st.rerun()
+                    batch_update_settlement_status(ids, batch_to)
+                    st.success(f"✅ 조회된 {len(ids)}건을 '{batch_to}'(으)로 변경했습니다.")
+                    st.rerun()
 
     st.markdown("<div style='margin-bottom: 1rem;'></div>", unsafe_allow_html=True)
 
