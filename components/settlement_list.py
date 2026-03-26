@@ -95,24 +95,44 @@ def render():
 
     # --- 일괄 상태 변경 ---
     with st.expander("⚡ 일괄 상태 변경"):
+        batch_mode = st.radio(
+            "변경 대상", ["상태 기준 일괄 변경", "선택한 항목만 변경"],
+            horizontal=True, key="batch_mode", label_visibility="collapsed"
+        )
         bc1, bc2, bc3 = st.columns([1.5, 1.5, 1])
-        with bc1:
-            batch_from = st.selectbox("현재 상태", SETTLEMENT_STATUSES, key="batch_from")
-        with bc2:
-            batch_to = st.selectbox("변경할 상태", SETTLEMENT_STATUSES, key="batch_to")
-        with bc3:
-            st.write("")
-            if st.button("일괄 변경", type="primary", use_container_width=True):
-                if batch_from == batch_to:
-                    st.warning("같은 상태로는 변경할 수 없습니다.")
-                else:
-                    targets = filtered[filtered["settlement_status"] == batch_from]
-                    if targets.empty:
-                        st.warning(f"'{batch_from}' 상태인 항목이 없습니다.")
+        if batch_mode == "상태 기준 일괄 변경":
+            with bc1:
+                batch_from = st.selectbox("현재 상태", SETTLEMENT_STATUSES, key="batch_from")
+            with bc2:
+                batch_to = st.selectbox("변경할 상태", SETTLEMENT_STATUSES, key="batch_to")
+            with bc3:
+                st.write("")
+                if st.button("일괄 변경", type="primary", use_container_width=True):
+                    if batch_from == batch_to:
+                        st.warning("같은 상태로는 변경할 수 없습니다.")
                     else:
-                        ids = targets["id"].tolist()
-                        batch_update_settlement_status(ids, batch_to)
-                        st.success(f"✅ {len(ids)}건을 '{batch_to}'(으)로 변경했습니다.")
+                        targets = filtered[filtered["settlement_status"] == batch_from]
+                        if targets.empty:
+                            st.warning(f"'{batch_from}' 상태인 항목이 없습니다.")
+                        else:
+                            ids = targets["id"].tolist()
+                            batch_update_settlement_status(ids, batch_to)
+                            st.success(f"✅ {len(ids)}건을 '{batch_to}'(으)로 변경했습니다.")
+                            st.rerun()
+        else:
+            selected_ids = [k.replace("set_chk_", "") for k, v in st.session_state.items() if k.startswith("set_chk_") and v]
+            with bc1:
+                st.info(f"☑️ {len(selected_ids)}건 선택됨")
+            with bc2:
+                batch_to_sel = st.selectbox("변경할 상태", SETTLEMENT_STATUSES, key="batch_to_sel")
+            with bc3:
+                st.write("")
+                if st.button("선택 항목 변경", type="primary", use_container_width=True):
+                    if not selected_ids:
+                        st.warning("아래 목록에서 항목을 선택해주세요.")
+                    else:
+                        batch_update_settlement_status(selected_ids, batch_to_sel)
+                        st.success(f"✅ {len(selected_ids)}건을 '{batch_to_sel}'(으)로 변경했습니다.")
                         st.rerun()
 
     st.markdown("<div style='margin-bottom: 1rem;'></div>", unsafe_allow_html=True)
@@ -138,11 +158,18 @@ def render():
     st.markdown("---")
 
     # --- 데이터 뷰 카드 레이아웃 ---
+    show_checkbox = st.session_state.get("batch_mode") == "선택한 항목만 변경"
+
     for _, row in page_df.iterrows():
         row_id = row["id"]
-        
+
         with st.container(border=True):
-            info_col, action_col = st.columns([4, 1])
+            if show_checkbox:
+                chk_col, info_col, action_col = st.columns([0.3, 3.7, 1])
+                with chk_col:
+                    st.checkbox("선택", key=f"set_chk_{row_id}", label_visibility="collapsed")
+            else:
+                info_col, action_col = st.columns([4, 1])
             
             with info_col:
                 st.markdown(f"{_status_badge(row.get('settlement_status', ''))} &nbsp;&nbsp; `<정산일:{row.get('settlement_date', '미입력')}>`", unsafe_allow_html=True)
