@@ -141,6 +141,12 @@ def append_vendor(name: str) -> None:
     st.session_state.vendors = sorted(vendors)
 
 
+def update_vendor(old_name: str, new_name: str) -> None:
+    _get_client().table("vendors").update({"name": new_name}).eq("name", old_name).execute()
+    vendors = [new_name if v == old_name else v for v in st.session_state.get("vendors", [])]
+    st.session_state.vendors = sorted(vendors)
+
+
 def delete_vendor(name: str) -> None:
     _get_client().table("vendors").delete().eq("name", name).execute()
     st.session_state.vendors = [v for v in st.session_state.get("vendors", []) if v != name]

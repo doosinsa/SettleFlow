@@ -1,6 +1,6 @@
 import streamlit as st
 
-from services.sheets_client import append_vendor, delete_vendor, get_all_vendors
+from services.sheets_client import append_vendor, delete_vendor, update_vendor, get_all_vendors
 
 
 def render():
@@ -47,10 +47,24 @@ def render():
         # 세련된 인라인 리스트 아이템 UI 
         cont = st.container(border=True)
         with cont:
-            col1, col2 = st.columns([6, 1])
+            col1, col2, col3 = st.columns([5, 1, 1])
             with col1:
                 st.markdown(f"**{vendor}**")
             with col2:
+                with st.popover("✏️ 수정", use_container_width=True):
+                    new_name = st.text_input("거래처명 변경", value=vendor, key=f"edit_input_{vendor}")
+                    if st.button("저장", key=f"edit_save_{vendor}", type="primary", use_container_width=True):
+                        new_name = new_name.strip()
+                        if not new_name:
+                            st.error("거래처명을 입력해주세요.")
+                        elif new_name == vendor:
+                            st.info("변경사항이 없습니다.")
+                        elif new_name in vendors:
+                            st.warning(f"'{new_name}' 거래처가 이미 존재합니다.")
+                        else:
+                            update_vendor(vendor, new_name)
+                            st.rerun()
+            with col3:
                 with st.popover("🗑️ 삭제", use_container_width=True):
                     st.warning(f"**'{vendor}'** 거래처를 삭제하시겠습니까?\n\n이 작업은 복구할 수 없습니다.")
                     if st.button("영구 삭제", key=f"del_{vendor}", type="primary"):
