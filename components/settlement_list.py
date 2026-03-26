@@ -103,7 +103,7 @@ def render():
             with sc2:
                 batch_to_sel = st.selectbox("변경할 상태", SETTLEMENT_STATUSES, key="batch_to_sel")
             with sc3:
-                st.write("")
+                st.markdown("<div style='height: 24px;'></div>", unsafe_allow_html=True)
                 if st.button("선택 항목 일괄 변경", type="primary", use_container_width=True):
                     batch_update_settlement_status(selected_ids, batch_to_sel)
                     for k in list(st.session_state.keys()):
@@ -117,14 +117,16 @@ def render():
         with bc1:
             batch_to = st.selectbox("변경할 상태", SETTLEMENT_STATUSES, key="batch_to")
         with bc2:
-            st.write("")
+            st.markdown("<div style='height: 24px;'></div>", unsafe_allow_html=True)
             if st.button("전체 일괄 변경", type="primary", use_container_width=True):
                 ids = filtered["id"].tolist()
                 if not ids:
                     st.warning("변경할 항목이 없습니다.")
                 else:
+                    for k in list(st.session_state.keys()):
+                        if k.startswith("set_chk_"):
+                            del st.session_state[k]
                     batch_update_settlement_status(ids, batch_to)
-                    st.success(f"✅ 조회된 {len(ids)}건을 '{batch_to}'(으)로 변경했습니다.")
                     st.rerun()
 
     st.markdown("<div style='margin-bottom: 1rem;'></div>", unsafe_allow_html=True)
